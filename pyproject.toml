@@ -1,0 +1,36 @@
+[tool.poetry]
+name = "recon-2"
+version = "0.1.0"
+description = ""
+authors = ["Kevin Mathew T <mathewtkevin@gmail.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.11"
+gdown = "^5.2.0"
+numpy = "^2.2.2"
+pandas = "^2.2.3"
+matplotlib = "^3.10.0"
+ipykernel = "^6.29.5"
+rerun-sdk = "^0.21.0"
+opencv-python = "^4.11.0.86"
+wandb = "^0.19.5"
+torchvision = "^0.21.0"
+torch = "^2.6.0"
+pillow = "^11.1.0"
+gradio = "^5.14.0"
+viz = "^0.0.5"
+imageio = "^2.37.0"
+scipy = "^1.15.1"
+evo = "^1.30.6"
+scikit-learn = "^1.6.1"
+scikit-image = "^0.25.1"
+prettytable = "^3.14.0"
+h5py = "^3.12.1"
+trimesh = "^4.6.1"
+pyglet = "<2"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
