@@ -191,7 +191,7 @@ class SpringDUSt3R(BaseStereoViewDataset):
 
 if __name__ == "__main__":
 
-    from datasets.viz.viz import SceneViz, auto_cam_size
+    from viz import SceneViz, auto_cam_size
     from utils.image import rgb
 
     use_augs = False

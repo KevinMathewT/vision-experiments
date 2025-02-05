@@ -29,6 +29,8 @@ prettytable = "^3.14.0"
 h5py = "^3.12.1"
 trimesh = "^4.6.1"
 pyglet = "<2"
+notebook = "^7.3.2"
+mediapy = "^1.2.2"
 
 
 [build-system]
