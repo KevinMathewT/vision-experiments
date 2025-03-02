@@ -6,9 +6,9 @@ authors = ["Kevin Mathew T <mathewtkevin@gmail.com>"]
 readme = "README.md"
 
 [tool.poetry.dependencies]
-python = "^3.11"
+python = ">=3.11,<3.13"
 gdown = "^5.2.0"
-numpy = "^2.2.2"
+numpy = "<2.2.0"
 pandas = "^2.2.3"
 matplotlib = "^3.10.0"
 ipykernel = "^6.29.5"
@@ -31,7 +31,10 @@ trimesh = "^4.6.1"
 pyglet = "<2"
 notebook = "^7.3.2"
 mediapy = "^1.2.2"
-
+gsutil = "^5.33"
+gcloud = "^0.18.3"
+tensorflow = ">=2.12,<3"
+waymo-open-dataset-tf-2-12-0 = "*"
 
 [build-system]
 requires = ["poetry-core"]

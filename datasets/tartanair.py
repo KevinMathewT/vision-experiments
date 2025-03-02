@@ -190,9 +190,12 @@ class TarTanAirDUSt3R(BaseStereoViewDataset):
         return views
 
 if __name__ == "__main__":
-
-    from datasets.viz.viz import SceneViz, auto_cam_size
-    from utils.image import rgb
+    import mediapy as media
+    import matplotlib.pyplot as plt
+    import rerun as rr
+    import numpy as np
+    import torch
+    import random
 
     use_augs = False
     S = 2
@@ -201,27 +204,59 @@ if __name__ == "__main__":
     quick = False  # Set to True for quick testing
 
 
-    def visualize_scene(idx):
-        views = dataset[idx]
-        assert len(views) == 2
-        viz = SceneViz()
-        poses = [views[view_idx]['camera_pose'] for view_idx in [0, 1]]
-        cam_size = max(auto_cam_size(poses), 1)
-        label = views[0]['label']
-        instance = views[0]['instance']
-        for view_idx in [0, 1]:
-            pts3d = views[view_idx]['pts3d']
-            valid_mask = views[view_idx]['valid_mask']
-            colors = rgb(views[view_idx]['img'])
-            viz.add_pointcloud(pts3d, colors, valid_mask)
-            viz.add_camera(pose_c2w=views[view_idx]['camera_pose'],
-                        focal=views[view_idx]['camera_intrinsics'][0, 0],
-                        color=(255, 0, 0),
-                        image=colors,
-                        cam_size=cam_size)
-        path = f"./tmp/tartanair/tartanair_scene_{label}_{instance}.glb"
-        viz.show()  # This should open an interactive viewer
-        return viz.save_glb(path)
+    def show_3d_viz(dataset):
+        i = random.randint(0, len(dataset))
+        # show_one_sample(dataset, i, 0)
+        # show_one_sample(dataset, i, 1)
+
+        def render(d):
+            pts3d = d['pts3d']
+            img = d['img']
+
+            pts3d = pts3d.reshape(-1, 3)
+
+            img = ((img.permute(1,2,0).numpy()+1)/2*255).astype(np.uint8)
+            colors = img.reshape(-1, 3)
+
+            rr.init("viz", spawn=True)
+            rr.log("scene", rr.Points3D(pts3d, colors=colors))
+
+        render(dataset[i][0])
+        render(dataset[i][1])
+    
+    def show_3d_viz_v2(ds):
+        i = random.randint(0, len(ds)-1)
+        smp = ds[i]  # smp has 2 frames: smp[0], smp[1]
+
+        rr.init("viz", spawn=True)
+
+        # Gather keypoint tracks across both frames
+        # Suppose tracks_3d is shape (N,3) in each frame
+        # => stacked we get (S,N,3), here S=2
+        frs_3d = []
+        for t in range(len(smp)):
+            frs_3d.append(smp[t]['tracks_3d'])  # (N,3)
+        frs_3d = np.stack(frs_3d, axis=0)      # (S,N,3)
+
+        # Create line strips: one line per keypoint
+        lines = []
+        for n in range(frs_3d.shape[1]):
+            line = frs_3d[:, n, :][None]       # shape (1,S,3)
+            lines.append(line)
+        lines = np.concatenate(lines, axis=0)  # shape (N,S,3)
+
+        # Give each line a random color
+        colors = np.random.randint(0, 255, (lines.shape[0], 3), dtype=np.uint8)
+
+        rr.log("scene/tracks", rr.LineStrips3D(lines, colors=colors))
+
+        # Log the dense depth-based points for both frames
+        for t in range(len(smp)):
+            pts = smp[t]['pts3d'].reshape(-1, 3)
+            img = ((smp[t]['img'].permute(1,2,0).numpy() + 1)/2*255).astype(np.uint8)
+            c   = img.reshape(-1, 3)
+            rr.log(f"scene/dense_{t}", rr.Points3D(pts, colors=c))
+            
 
     dataset = TarTanAirDUSt3R(
         dset='Easy',
@@ -247,4 +282,5 @@ if __name__ == "__main__":
             print(f"{k}:", dataset[idxs[0]][0][k])
     # for idx in idxs:
     #     print(f"Visualizing scene {idx}...")
-    #     visualize_scene(idx)
+    
+    show_3d_viz_v2(dataset)

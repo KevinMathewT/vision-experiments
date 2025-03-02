@@ -197,6 +197,7 @@ class PointOdysseyDUSt3R(BaseStereoViewDataset):
         annotations = np.load(annotations_path, allow_pickle=True)
         pix_T_cams = annotations["intrinsics"][full_idx].astype(np.float32)
         cams_T_world = annotations["extrinsics"][full_idx].astype(np.float32)
+        tracks_3d = annotations["trajs_3d"][full_idx].astype(np.float32)  # shape (S, num_points, 3)
 
         views = []
         for i in range(2):
@@ -234,18 +235,73 @@ class PointOdysseyDUSt3R(BaseStereoViewDataset):
                     dataset=self.dataset_label,
                     label=rgb_paths[i].split("/")[-3],
                     instance=osp.split(rgb_paths[i])[1],
+                    tracks_3d=tracks_3d[i],  # <--- new
                 )
             )
         return views
 
 
 if __name__ == "__main__":
-    from datasets.base.base_stereo_view_dataset import view_name
-    from datasets.viz.viz import SceneViz, auto_cam_size
-    from utils.image import rgb
-    import gradio as gr
+    import mediapy as media
+    import matplotlib.pyplot as plt
+    import rerun as rr
+    import numpy as np
+    import torch
     import random
 
+    def show_3d_viz(dataset):
+        i = random.randint(0, len(dataset))
+        # show_one_sample(dataset, i, 0)
+        # show_one_sample(dataset, i, 1)
+
+        def render(d):
+            pts3d = d['pts3d']
+            img = d['img']
+
+            pts3d = pts3d.reshape(-1, 3)
+
+            img = ((img.permute(1,2,0).numpy()+1)/2*255).astype(np.uint8)
+            colors = img.reshape(-1, 3)
+
+            rr.init("viz", spawn=True)
+            rr.log("scene", rr.Points3D(pts3d, colors=colors))
+
+        render(dataset[i][0])
+        render(dataset[i][1])
+    
+    def show_3d_viz_v2(ds):
+        i = random.randint(0, len(ds)-1)
+        smp = ds[i]  # smp has 2 frames: smp[0], smp[1]
+
+        rr.init("viz", spawn=True)
+
+        # Gather keypoint tracks across both frames
+        # Suppose tracks_3d is shape (N,3) in each frame
+        # => stacked we get (S,N,3), here S=2
+        frs_3d = []
+        for t in range(len(smp)):
+            frs_3d.append(smp[t]['tracks_3d'])  # (N,3)
+        frs_3d = np.stack(frs_3d, axis=0)      # (S,N,3)
+
+        # Create line strips: one line per keypoint
+        lines = []
+        for n in range(frs_3d.shape[1]):
+            line = frs_3d[:, n, :][None]       # shape (1,S,3)
+            lines.append(line)
+        lines = np.concatenate(lines, axis=0)  # shape (N,S,3)
+
+        # Give each line a random color
+        colors = np.random.randint(0, 255, (lines.shape[0], 3), dtype=np.uint8)
+
+        rr.log("scene/tracks", rr.LineStrips3D(lines, colors=colors))
+
+        # Log the dense depth-based points for both frames
+        for t in range(len(smp)):
+            pts = smp[t]['pts3d'].reshape(-1, 3)
+            img = ((smp[t]['img'].permute(1,2,0).numpy() + 1)/2*255).astype(np.uint8)
+            c   = img.reshape(-1, 3)
+            rr.log(f"scene/dense_{t}", rr.Points3D(pts, colors=c))
+            
     dataset_location = "data/pointodyssey"  # Change this to the correct path
     dset = "sample"
     use_augs = False
@@ -254,29 +310,6 @@ if __name__ == "__main__":
     strides = [1, 2, 3, 4, 5, 6, 7, 8, 9]
     clip_step = 2
     quick = False  # Set to True for quick testing
-
-    def visualize_scene(idx):
-        views = dataset[idx]
-        assert len(views) == 2
-        viz = SceneViz()
-        poses = [views[view_idx]["camera_pose"] for view_idx in [0, 1]]
-        cam_size = max(auto_cam_size(poses), 0.25)
-        for view_idx in [0, 1]:
-            pts3d = views[view_idx]["pts3d"]
-            valid_mask = views[view_idx]["valid_mask"]
-            colors = rgb(views[view_idx]["img"])
-            viz.add_pointcloud(pts3d, colors, valid_mask)
-            viz.add_camera(
-                pose_c2w=views[view_idx]["camera_pose"],
-                focal=views[view_idx]["camera_intrinsics"][0, 0],
-                color=(255, 0, 0),
-                image=colors,
-                cam_size=cam_size,
-            )
-
-        # Ensure visualization is displayed
-        viz.show()  # This should open an interactive viewer
-        return viz
 
     dataset = PointOdysseyDUSt3R(
         dataset_location=dataset_location,
@@ -294,7 +327,6 @@ if __name__ == "__main__":
         aug_focal=1,
         z_far=80,
     )
-    # around 514k samples
 
     idxs = np.arange(0, len(dataset) - 1, (len(dataset) - 1) // 10)
 
@@ -308,9 +340,7 @@ if __name__ == "__main__":
         else:
             print(f"{k}:", dataset[idxs[0]][0][k])
 
-    # idx = random.randint(0, len(dataset)-1)
-    # idx = 0
-    print(idxs)
-    for idx in idxs[1:]:
-        print(f"Visualizing scene {idx}...")
-        visualize_scene(idx)
+    print(f"data['img']: {dataset[0][0]['img']}")
+    print(f"data['depthmap']: {dataset[0][0]['depthmap']}")
+
+    show_3d_viz_v2(dataset)
