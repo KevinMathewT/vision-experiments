@@ -1,12 +1,13 @@
 [tool.poetry]
-name = "recon-2"
+name = "vision-experiments"
 version = "0.1.0"
 description = ""
 authors = ["Kevin Mathew T <mathewtkevin@gmail.com>"]
 readme = "README.md"
+package-mode = false
 
 [tool.poetry.dependencies]
-python = "3.10.2"
+python = "3.11.11"
 gdown = "^5.2.0"
 numpy = "<2.2.0"
 pandas = "^2.2.3"
@@ -38,6 +39,7 @@ jax = "0.4.27"
 jaxlib = "0.4.27"
 optax = "^0.2.4"
 chex = "^0.1.89"
+einops = "^0.8.1"
 
 [build-system]
 requires = ["poetry-core"]
