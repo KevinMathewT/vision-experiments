@@ -156,6 +156,7 @@ def main():
 
     motion_map = geo.get_motion_map_from_cam_pc(cam_pc_valids, cams[0][0], frame_infos[0]["dm"].shape)
 
+    print("--------------------------- total points -> valid points -> motion valid points")
     for ti in range(motion_map.shape[0]):
         print(f"valid in motion_map at t={ti}: {frame_infos[ti]['world_pc_valid'].shape[0]} + {frame_infos[ti + 1]['world_pc_valid'].shape[0]} -> {int(cam_pc_valids[ti][:, -1].sum())} + {int(cam_pc_valids[ti + 1][:, -1].sum())} -> {int(motion_map[ti, ..., -1].sum())}")
 

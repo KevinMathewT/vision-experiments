@@ -153,6 +153,7 @@ def cam_pc_to_cam_pm(cam_pc, cam, image_shape, valid=False):
 
     cam_pm = np.zeros((height, width, 4), dtype=cam_pc.dtype)
 
+    # negative z
     validity_mask = (z > 0) & (u >= 0) & (u < width) & (v >= 0) & (v < height)
 
     if valid and cam_pc.shape[1] == 4:
@@ -222,6 +223,7 @@ def get_motion_map_from_cam_pc(cam_pc_valid_list, ref_intrinsics, image_dimensio
         fx, fy = ref_intrinsics[0, 0], ref_intrinsics[1, 1]  # (scalar, scalar)
         cx, cy = ref_intrinsics[0, 2], ref_intrinsics[1, 2]  # (scalar, scalar)
 
+        # negative z
         z_positive_mask = z > 0  # (M,)
         x, y, z = x[z_positive_mask], y[z_positive_mask], z[z_positive_mask]  # (M',)
         motion_3d = motion_3d[z_positive_mask]  # (M', 3)
