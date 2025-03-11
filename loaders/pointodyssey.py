@@ -1,3 +1,8 @@
+"""
+Author: Kevin Mathew T
+Date: 2025-03-10
+"""
+
 import cv2
 import numpy as np
 import loaders.utils.geometry as geo
@@ -139,9 +144,6 @@ def main():
 
     world_pcs = [f["world_pc_valid"][:, :3] for f in frame_infos]
     valid_flags = [f["world_pc_valid"][..., 3:4] for f in frame_infos]
-
-    # print(f"total points in world_pc: {frame_infos[0]['world_pc_valid'].shape[0]}")
-    # print(f"valid in world_pc: {frame_infos[0]['world_pc_valid'][:, -1].sum()}")
 
     cam_pcs = [geo.world_pc_to_cam_pc(world_pcs[i], cams[0]) for i in range(t)]
     cam_pc_valids = [np.concatenate([cam_pcs[i], valid_flags[i]], axis=1) for i in range(t)]

@@ -1,5 +1,6 @@
 """
-geometry.py
+Author: Kevin Mathew T
+Date: 2025-03-10
 
 This module defines geometric conventions for cam models, transformations, and 3D point representations.
 

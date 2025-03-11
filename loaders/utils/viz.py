@@ -1,3 +1,8 @@
+"""
+Author: Kevin Mathew T
+Date: 2025-03-10
+"""
+
 import rerun as rr
 import numpy as np
 import loaders.utils.geometry as geo
@@ -32,7 +37,7 @@ def visualize_cam_movement_in_world(dataset, seq_path, num_frames):
     It decomposes extrinsics into translation and quaternion representation, 
     and logs each frame's camera parameters under a "pinhole/{i}" namespace.
     """
-    
+
     rr.init("Camera_Movement", spawn=True)
     rr.spawn()
 
