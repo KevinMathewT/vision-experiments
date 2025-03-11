@@ -50,7 +50,6 @@ def visualize_cam_movement_in_world(dataset, seq_path, num_frames):
         cx, cy = intrinsics[0, 2], intrinsics[1, 2]
         img_height, img_width = image.shape[:2]
         translation, quaternion = decompose_extrinsics(extrinsics)
-        # translation, quaternion = tuple(translation), tuple(quaternion)
         rr.log(f"pinhole/{i}", rr.Transform3D(translation=translation, quaternion=quaternion))
         rr.log(f"pinhole/{i}", rr.Pinhole(
             focal_length=(fx, fy),
@@ -96,25 +95,23 @@ def visualize_pc(pc_valid, image=None, cam=None, valid=True, name="point_cloud",
     
     pc_valid = np.asarray(pc_valid)
     
-    if pc_valid.shape[1] == 4:  # If validity column is present
+    if pc_valid.shape[1] == 4:
         if valid:
-            pc_valid = pc_valid[pc_valid[:, 3] > 0][:, :3]  # Filter valid points
+            pc_valid = pc_valid[pc_valid[:, 3] > 0][:, :3]
         else:
-            pc_valid = pc_valid[:, :3]  # Drop validity column
+            pc_valid = pc_valid[:, :3]
     
     if image is not None and cam is not None:
         intrinsics, extrinsics = cam
         
-        # Convert world coordinates to cam coordinates if needed
         if not pc_in_cam_coords:
             pc_h = np.hstack((pc_valid, np.ones((pc_valid.shape[0], 1))))
-            cam_coords = (extrinsics @ pc_h.T).T[:, :3]  # Transform to cam space
+            cam_coords = (extrinsics @ pc_h.T).T[:, :3]
         else:
-            cam_coords = pc_valid  # Already in cam space
+            cam_coords = pc_valid
         
-        # Project points into image space
         uv = (intrinsics @ cam_coords.T).T
-        uv /= uv[:, 2:3]  # Normalize
+        uv /= uv[:, 2:3]
         uv = uv[:, :2].astype(int)
         
         h, w, _ = image.shape
@@ -134,17 +131,16 @@ def visualize_pc(pc_valid, image=None, cam=None, valid=True, name="point_cloud",
             principal_point=[intrinsics[0, 2], intrinsics[1, 2]]
         ))
         
-        # Log cam transform correctly
         if not pc_in_cam_coords:
-            R = extrinsics[:3, :3]  # Rotation matrix
-            t = extrinsics[:3, 3]   # Translation vector
-            R_inv = R.T  # Inverse of rotation (since R is orthonormal, R^T = R^-1)
-            t_inv = -R_inv @ t  # Inverted translation
+            R = extrinsics[:3, :3]
+            t = extrinsics[:3, 3]
+            R_inv = R.T
+            t_inv = -R_inv @ t
             inv_extrinsics = np.eye(4)
             inv_extrinsics[:3, :3] = R_inv
             inv_extrinsics[:3, 3] = t_inv
             translation, quaternion = decompose_extrinsics(inv_extrinsics)
-            rr.log("cam_pose", rr.Transform3D(translation=translation, quaternion=quaternion))  # Camera in world coordinates
+            rr.log("cam_pose", rr.Transform3D(translation=translation, quaternion=quaternion))
         
         rr.log("cam", rr.Image(image))
 
@@ -169,9 +165,9 @@ def visualize_motion_map(motion_map, pm, cam=None, valid=True, name="motion_map"
     points_3d = pm[y, x, :3]
 
     if len(points_3d) == 0:
-        return  # No valid points found
+        return
 
-    segments = np.stack([points_3d, points_3d + motion_vectors], axis=1)  # Create motion segments
+    segments = np.stack([points_3d, points_3d + motion_vectors], axis=1)
 
     rr.init(name, spawn=True)
     rr.log(name, rr.SeriesLine(segments=segments))
@@ -239,25 +235,23 @@ def visualize_pm(pm, image=None, cam=None, valid=True, name="pm", pc_in_cam_coor
     H, W, C = pm.shape
     pc_valid = pm.reshape(-1, C)
     
-    if pc_valid.shape[1] == 4:  # If validity column is present
+    if pc_valid.shape[1] == 4:
         if valid:
-            pc_valid = pc_valid[pc_valid[:, 3] > 0][:, :3]  # Filter valid points
+            pc_valid = pc_valid[pc_valid[:, 3] > 0][:, :3]
         else:
-            pc_valid = pc_valid[:, :3]  # Drop validity column
+            pc_valid = pc_valid[:, :3]
     
     if image is not None and cam is not None:
         intrinsics, extrinsics = cam
         
-        # Convert world coordinates to cam coordinates if needed
         if not pc_in_cam_coords:
             pc_h = np.hstack((pc_valid, np.ones((pc_valid.shape[0], 1))))
-            cam_coords = (extrinsics @ pc_h.T).T[:, :3]  # Transform to cam space
+            cam_coords = (extrinsics @ pc_h.T).T[:, :3]
         else:
-            cam_coords = pc_valid  # Already in cam space
+            cam_coords = pc_valid
         
-        # Project points into image space
         uv = (intrinsics @ cam_coords.T).T
-        uv /= uv[:, 2:3]  # Normalize
+        uv /= uv[:, 2:3]
         uv = uv[:, :2].astype(int)
         
         h, w, _ = image.shape
@@ -277,17 +271,16 @@ def visualize_pm(pm, image=None, cam=None, valid=True, name="pm", pc_in_cam_coor
             principal_point=[intrinsics[0, 2], intrinsics[1, 2]]
         ))
         
-        # Log cam transform correctly
         if not pc_in_cam_coords:
-            R = extrinsics[:3, :3]  # Rotation matrix
-            t = extrinsics[:3, 3]   # Translation vector
-            R_inv = R.T  # Inverse of rotation (since R is orthonormal, R^T = R^-1)
-            t_inv = -R_inv @ t  # Inverted translation
+            R = extrinsics[:3, :3]
+            t = extrinsics[:3, 3]
+            R_inv = R.T
+            t_inv = -R_inv @ t
             inv_extrinsics = np.eye(4)
             inv_extrinsics[:3, :3] = R_inv
             inv_extrinsics[:3, 3] = t_inv
             translation, quaternion = decompose_extrinsics(inv_extrinsics)
-            rr.log("cam_pose", rr.Transform3D(translation=translation, quaternion=quaternion))  # Camera in world coordinates
+            rr.log("cam_pose", rr.Transform3D(translation=translation, quaternion=quaternion))
         
         rr.log("cam", rr.Image(image))
 
@@ -311,7 +304,6 @@ def visualize_sequence_from_pms(pms, motion_map, image_seq=None, name="seq_pm"):
     T = len(pms)
     assert motion_map.shape[0] == T - 1
 
-    # Initialize first frame data
     pm = pms[0].reshape(-1, 4)
     valid_mask = pm[:, 3] > 0
     pc_valid = pm[valid_mask][:, :3]
@@ -333,7 +325,6 @@ def visualize_sequence_from_pms(pms, motion_map, image_seq=None, name="seq_pm"):
             rr.set_time_sequence("time", 2 * t + 1)
             rr.log("motion_vectors", rr.LineStrips3D(strips=lines))
 
-            # Fetch next frame data to avoid recomputation
             pm = pms[t + 1].reshape(-1, 4)
             valid_mask = pm[:, 3] > 0
             pc_valid = pm[valid_mask][:, :3]
@@ -344,21 +335,17 @@ def visualize_sequence_from_pms(pms, motion_map, image_seq=None, name="seq_pm"):
     print(f"Visualized sequence: {T} frames.")
 
 
-
-
 def test_visualize_pc():
     test_points = np.array([
-        [0, 0, 1],    # In front of the cam
-        [1, 1, 2],    # Slightly further
-        [2, 0, 3],    # Further right
-        [1, -1, 4],   # Another point
-        [-1, 2, 5]    # Further back
+        [0, 0, 1],
+        [1, 1, 2],
+        [2, 0, 3],
+        [1, -1, 4],
+        [-1, 2, 5]
     ], dtype=np.float32)
 
-    # Create a dummy validity column (all valid)
     test_validity = np.ones((test_points.shape[0], 1), dtype=np.float32)
 
-    # Combine into a (N, 4) shape (x, y, z, validity)
     test_pc_valid = np.hstack((test_points, test_validity))
 
     print(f"Calling visualize_pc with manually created data: {test_pc_valid.shape}")
@@ -367,7 +354,7 @@ def test_visualize_pc():
 
 def test_rerun():
     rr.init("test_rerun")
-    rr.spawn()  # Ensures Rerun Viewer starts
+    rr.spawn()
 
     test_points = np.array([
         [0, 0, 0],
@@ -389,4 +376,4 @@ def test_rerun():
     rr.log("test_points", rr.Points3D(positions=test_points, colors=test_colors))
     print("Logged successfully!")
     
-    rr.disconnect()  # Close connection so script can exit
+    rr.disconnect()

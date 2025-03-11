@@ -1,44 +1,6 @@
 """
 Author: Kevin Mathew T
 Date: 2025-03-10
-
-This module defines geometric conventions for cam models, transformations, and 3D point representations.
-
-Conventions:
-
-1. **Intrinsic Matrix (K)**: (3 × 3)
-   - Defines the internal parameters of the cam.
-   - Used to project 3D points in the cam frame to 2D image coordinates.
-
-2. **Extrinsic Matrix ([R | t])**: (4 × 4 homogeneous)
-   - Describes the transformation from world coordinates to cam coordinates.
-   - R: (3 × 3) rotation matrix (orthonormal).
-   - t: (3 × 1) translation vector.
-   - Extrinsic matrix form:
-     | R  t |
-     | 0  1 |
-
-3. **Depth Map (D)**: (H × W)
-   - Stores per-pixel depth values.
-   - Each value represents the distance from the cam to the scene.
-
-4. **Point Map (P_m)**: (H × W × 3)
-   - Stores 3D points corresponding to each pixel.
-   - Derived from the depth map using intrinsic parameters.
-
-5. **Camera Point Cloud (P_c)**: (N × 3)
-   - A set of 3D points expressed in the cam coordinate system.
-   - Obtained by back-projecting the depth map.
-
-6. **World Point Cloud (P_w)**: (N × 3)
-   - A set of 3D points in the world coordinate system.
-   - Related to cam points by the extrinsic transformation: P_w = R^T (P_c - t).
-
-Usage:
-- Convert depth maps to point clouds.
-- Transform between cam and world coordinates.
-- Perform projections and re-projections.
-
 """
 
 import numpy as np
@@ -49,9 +11,9 @@ def decompose_extrinsics(extrinsics):
     """
     Decomposes a 4x4 extrinsic matrix into translation and rotation (as quaternion).
     """
-    translation = extrinsics[:3, 3]  # Extract translation vector
-    rotation_matrix = extrinsics[:3, :3]  # Extract rotation matrix
-    quaternion = Rotation.from_matrix(rotation_matrix).as_quat()  # Convert to quaternion (xyzw)
+    translation = extrinsics[:3, 3]
+    rotation_matrix = extrinsics[:3, :3]
+    quaternion = Rotation.from_matrix(rotation_matrix).as_quat()
     return translation, quaternion
 
 
@@ -96,10 +58,10 @@ def cam_pc_to_world_pc(cam_pc, cam):
         numpy.ndarray: (N, 3) - World point cloud in world coordinates.
     """
     _, extrinsics = cam
-    R = extrinsics[:3, :3]        # (3, 3) Rotation matrix
-    t = extrinsics[:3, 3]         # (3,) Translation vector
-    world_pc = (R.T @ (cam_pc - t).T).T  # (N, 3)
-    return world_pc      # (N, 3)
+    R = extrinsics[:3, :3] # (3, 3)
+    t = extrinsics[:3, 3] # (3,)
+    world_pc = (R.T @ (cam_pc - t).T).T # (N, 3)
+    return world_pc # (N, 3)
 
 def world_pc_to_cam_pc(world_pc, cam):
     """
@@ -117,8 +79,8 @@ def world_pc_to_cam_pc(world_pc, cam):
         numpy.ndarray: (N, 3) - Camera point cloud in cam coordinates.
     """
     _, extrinsics = cam
-    R = extrinsics[:3, :3]  # (3, 3) Rotation matrix
-    t = extrinsics[:3, 3]   # (3,) Translation vector
+    R = extrinsics[:3, :3]  # (3, 3)
+    t = extrinsics[:3, 3]  # (3,)
     cam_pc = (R @ world_pc.T).T + t  # (N, 3)
     return cam_pc  # (N, 3)
 
@@ -154,8 +116,8 @@ def dm_to_cam_pm(dm, cam):
     """
     intrinsics, _ = cam
     H, W = dm.shape  # (H, W)
-    fx, fy = intrinsics[0, 0], intrinsics[1, 1]  # Scalars
-    cx, cy = intrinsics[0, 2], intrinsics[1, 2]  # Scalars
+    fx, fy = intrinsics[0, 0], intrinsics[1, 1]  # scalar
+    cx, cy = intrinsics[0, 2], intrinsics[1, 2]  # scalar
     u, v = np.meshgrid(np.arange(W), np.arange(H))  # (H, W)
     x = (u - cx) / fx  # (H, W)
     y = (v - cy) / fy  # (H, W)
@@ -197,7 +159,7 @@ def cam_pc_to_cam_pm(cam_pc, cam, image_shape, valid=False):
         validity_mask &= cam_pc[:, 3] > 0
 
     cam_pm[v[validity_mask], u[validity_mask], :3] = cam_pc[validity_mask, :3]
-    cam_pm[v[validity_mask], u[validity_mask], 3] = 1  # Mark valid pixels
+    cam_pm[v[validity_mask], u[validity_mask], 3] = 1  # mark valid pixels
 
     return cam_pm
 
@@ -222,7 +184,7 @@ def compute_scale_difference(approx_pm, actual_pm):
     actual_points = actual_pm[valid_mask, :3]
 
     if len(approx_points) == 0:
-        return None  # No valid points for comparison
+        return None  # no valid points
 
     scale_ratios = np.linalg.norm(actual_points, axis=1) / np.linalg.norm(approx_points, axis=1)
     print(f"Scale Ratios: {scale_ratios}")

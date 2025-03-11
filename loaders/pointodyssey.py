@@ -53,7 +53,7 @@ class PointOdyssey:
 
         return {
             "image": image,  # (H, W, 3)
-            "world_pc_valid": world_pc_valid ,  # (N, 4) scaled by factor of "scale"
+            "world_pc_valid": world_pc_valid ,  # (N, 4) scaled by factor "scale"
             "cam": cam,  # ((3, 3), (4, 4) homogeneous)
             "dm": dm,  # convert to meters, (H, W)
         }
@@ -76,7 +76,7 @@ def main():
         else:
             print(k, v[0].shape, v[1].shape)
 
-    # viz.visualize_cam_movement_in_world(dataset, seq_path, num_frames=10)
+    viz.visualize_cam_movement_in_world(dataset, seq_path, num_frames=10)
 
     world_pc_valid = frame_info["world_pc_valid"]
     dm = frame_info["dm"]
@@ -136,7 +136,7 @@ def main():
         # name="cam_dm_pc",
     )
 
-    t = 50  # Define the number of timesteps
+    t = 50
 
     frame_infos = [dataset.get_frame_info(seq_path, i) for i in range(t)]
     cams = [f["cam"] for f in frame_infos]

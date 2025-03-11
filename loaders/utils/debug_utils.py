@@ -18,14 +18,14 @@ def compute_point_cloud_scale_stats(pc1, pc2):
         scale_ratio: Mean distance ratio (depth_pc / track_pc)
         stats: Dictionary containing mean, median, std deviation of distances
     """
-    d1 = np.linalg.norm(pc1, axis=1)  # Compute Euclidean distances for pc1
-    d2 = np.linalg.norm(pc2, axis=1)  # Compute Euclidean distances for pc2
+    d1 = np.linalg.norm(pc1, axis=1)
+    d2 = np.linalg.norm(pc2, axis=1)
 
     mean_d1, mean_d2 = np.mean(d1), np.mean(d2)
     median_d1, median_d2 = np.median(d1), np.median(d2)
     std_d1, std_d2 = np.std(d1), np.std(d2)
 
-    scale_ratio = mean_d1 / mean_d2  # How much pc1 is scaled compared to pc2
+    scale_ratio = mean_d1 / mean_d2
 
     stats = {
         "depth_map_pc": {"mean": mean_d1, "median": median_d1, "std": std_d1},
@@ -62,7 +62,6 @@ def compute_optimal_scale(depth_map_pc, track_pc, scale_range=(0.01, 500), toler
     Returns:
         float: Optimal scale factor.
     """
-    # Build KDTree for fast nearest neighbor search
     tree = cKDTree(track_pc)
 
     def mse_for_scale(scale):
@@ -73,7 +72,6 @@ def compute_optimal_scale(depth_map_pc, track_pc, scale_range=(0.01, 500), toler
         mse = np.mean(np.linalg.norm(scaled_pc - matched_track_pc, axis=1) ** 2)
         return mse
 
-    # Binary search for the best scale
     low, high = scale_range
     best_scale, best_mse = low, float('inf')
 
@@ -85,7 +83,6 @@ def compute_optimal_scale(depth_map_pc, track_pc, scale_range=(0.01, 500), toler
             best_mse = mse_mid
             best_scale = mid
 
-        # Decide search direction
         mse_low = mse_for_scale(low)
         mse_high = mse_for_scale(high)
 
