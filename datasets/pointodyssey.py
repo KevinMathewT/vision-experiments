@@ -2,6 +2,7 @@ import sys
 
 sys.path.append(".")
 import os
+import PIL
 import torch
 import numpy as np
 import os.path as osp
@@ -186,6 +187,79 @@ class PointOdysseyDUSt3R(BaseStereoViewDataset):
 
     def __len__(self):
         return len(self.rgb_paths)
+    
+    def crop_tracks(self, tracks_2d, tracks_3d, image, intrinsics, info=None):
+        """
+        Crops 2D and 3D tracks using the same crop bounding box as used for image cropping.
+        
+        Parameters:
+            tracks_2d (np.ndarray): Array of 2D track points of shape (N, 2).
+            tracks_3d (np.ndarray): Array of corresponding 3D track points of shape (N, 3).
+            image (PIL.Image.Image): The image used to compute the crop bounding box.
+            intrinsics (np.ndarray): The camera intrinsics matrix.
+            info (any, optional): Optional info for error messages.
+            
+        Returns:
+            cropped_tracks_2d (np.ndarray): Adjusted 2D track points after cropping.
+            cropped_tracks_3d (np.ndarray): Filtered 3D track points corresponding to valid 2D points.
+            valid_mask (np.ndarray): Boolean mask indicating which points fall within the crop.
+        """
+
+        if not isinstance(image, PIL.Image.Image):
+            image = PIL.Image.fromarray(image)
+
+        crop_bbox = self._compute_crop_bbox(image, intrinsics, info)
+        l, t, r, b = crop_bbox
+        
+        tracks_2d = np.asarray(tracks_2d)
+        tracks_3d = np.asarray(tracks_3d)
+        
+        valid_mask = (
+            (tracks_2d[:, 0] >= l) & (tracks_2d[:, 0] < r) &
+            (tracks_2d[:, 1] >= t) & (tracks_2d[:, 1] < b)
+        )
+        
+        cropped_tracks_2d = tracks_2d[valid_mask].copy()
+        cropped_tracks_2d[:, 0] -= l
+        cropped_tracks_2d[:, 1] -= t
+        cropped_tracks_3d = tracks_3d[valid_mask].copy()
+        
+        return cropped_tracks_2d, cropped_tracks_3d, valid_mask
+
+    def crop_tracks_union(self, tracks_2d_0, tracks_2d_1, tracks_3d_0, tracks_3d_1, image0, image1, intrinsics0, intrinsics1, info0=None, info1=None):
+        bbox0 = self._compute_crop_bbox(image0, intrinsics0, info0)
+        bbox1 = self._compute_crop_bbox(image1, intrinsics1, info1)
+        l0, t0, r0, b0 = bbox0
+        l1, t1, r1, b1 = bbox1
+        tracks_2d_0 = np.asarray(tracks_2d_0)
+        tracks_2d_1 = np.asarray(tracks_2d_1)
+        tracks_3d_0 = np.asarray(tracks_3d_0)
+        tracks_3d_1 = np.asarray(tracks_3d_1)
+        valid0 = ((tracks_2d_0[:, 0] >= l0) & (tracks_2d_0[:, 0] < r0) &
+                  (tracks_2d_0[:, 1] >= t0) & (tracks_2d_0[:, 1] < b0))
+        valid1 = ((tracks_2d_1[:, 0] >= l1) & (tracks_2d_1[:, 0] < r1) &
+                  (tracks_2d_1[:, 1] >= t1) & (tracks_2d_1[:, 1] < b1))
+        
+        print("valid0:", np.bincount(valid0.ravel()))
+        print("valid1:", np.bincount(valid1.ravel()))
+        union_mask = (valid0 | valid1)
+        print("union_mask:", np.bincount(union_mask.ravel()))
+        union_mask = np.logical_not(valid0 | valid1)
+        print("union_mask:", np.bincount(union_mask.ravel()))
+        union_mask = np.logical_not(valid0 & valid1)
+        print("union_mask:", np.bincount(union_mask.ravel()))
+        union_mask = valid0 & valid1
+        print("union_mask:", np.bincount(union_mask.ravel()))
+
+        cropped_tracks_2d_0 = tracks_2d_0[union_mask].copy()
+        cropped_tracks_2d_1 = tracks_2d_1[union_mask].copy()
+        cropped_tracks_2d_0[:, 0] -= l0
+        cropped_tracks_2d_0[:, 1] -= t0
+        cropped_tracks_2d_1[:, 0] -= l1
+        cropped_tracks_2d_1[:, 1] -= t1
+        cropped_tracks_3d_0 = tracks_3d_0[union_mask]
+        cropped_tracks_3d_1 = tracks_3d_1[union_mask]
+        return cropped_tracks_2d_0, cropped_tracks_2d_1, cropped_tracks_3d_0, cropped_tracks_3d_1, union_mask
 
     def _get_views(self, index, resolution, rng):
 
@@ -197,7 +271,28 @@ class PointOdysseyDUSt3R(BaseStereoViewDataset):
         annotations = np.load(annotations_path, allow_pickle=True)
         pix_T_cams = annotations["intrinsics"][full_idx].astype(np.float32)
         cams_T_world = annotations["extrinsics"][full_idx].astype(np.float32)
+        tracks_2d = annotations["trajs_2d"][full_idx].astype(np.float32)  # shape (S, num_points, 2)
         tracks_3d = annotations["trajs_3d"][full_idx].astype(np.float32)  # shape (S, num_points, 3)
+
+        temp = []
+        for i in range(2):
+            impath = rgb_paths[i]
+            intrinsics = pix_T_cams[i]
+            rgb_image = imread_cv2(impath)
+            depthpath = depth_paths[i]
+            depth16 = cv2.imread(depthpath, cv2.IMREAD_ANYDEPTH)
+            depthmap = depth16.astype(np.float32) / 65535.0 * 1000.0
+            rgb_image, depthmap, intrinsics = self._crop_resize_if_necessary(
+                rgb_image, depthmap, intrinsics, resolution, rng=rng, info=impath
+            )
+            temp.append((rgb_image, intrinsics, impath, depthmap))
+
+        ct2d_0, ct2d_1, ct3d_0, ct3d_1, union_mask = self.crop_tracks_union(
+            tracks_2d[0], tracks_2d[1], tracks_3d[0], tracks_3d[1],
+            temp[0][0], temp[1][0],
+            temp[0][1], temp[1][1],
+            info0=temp[0][2], info1=temp[1][2]
+        )
 
         views = []
         for i in range(2):
@@ -213,31 +308,26 @@ class PointOdysseyDUSt3R(BaseStereoViewDataset):
             camera_pose = np.eye(4, dtype=np.float32)
             camera_pose[:3, :3] = R.T
             camera_pose[:3, 3] = -R.T @ t
-            intrinsics = pix_T_cams[i]
 
-            # load image and depth
-            rgb_image = imread_cv2(impath)
-            depth16 = cv2.imread(depthpath, cv2.IMREAD_ANYDEPTH)
-            depthmap = (
-                depth16.astype(np.float32) / 65535.0 * 1000.0
-            )  # 1000 is the max depth in the dataset
-
-            rgb_image, depthmap, intrinsics = self._crop_resize_if_necessary(
-                rgb_image, depthmap, intrinsics, resolution, rng=rng, info=impath
+            rgb_image, intrinsics, impath, depthmap = temp[i]
+            view = dict(
+                img=rgb_image,
+                depthmap=depthmap,
+                camera_pose=camera_pose,
+                camera_intrinsics=intrinsics,
+                dataset=self.dataset_label,
+                label=rgb_paths[i].split("/")[-3],
+                instance=osp.split(rgb_paths[i])[1],
             )
-
-            views.append(
-                dict(
-                    img=rgb_image,
-                    depthmap=depthmap,
-                    camera_pose=camera_pose,
-                    camera_intrinsics=intrinsics,
-                    dataset=self.dataset_label,
-                    label=rgb_paths[i].split("/")[-3],
-                    instance=osp.split(rgb_paths[i])[1],
-                    tracks_3d=tracks_3d[i],  # <--- new
-                )
-            )
+            if i == 0:
+                view['tracks_2d'] = ct2d_0
+            else:
+                view['tracks_2d'] = ct2d_1
+            if i == 0:
+                view['tracks_3d'] = ct3d_0
+            else:
+                view['tracks_3d'] = ct3d_1
+            views.append(view)
         return views
 
 
@@ -250,7 +340,7 @@ if __name__ == "__main__":
     import random
 
     def show_3d_viz(dataset):
-        i = random.randint(0, len(dataset))
+        i = 0 # random.randint(0, len(dataset))
         # show_one_sample(dataset, i, 0)
         # show_one_sample(dataset, i, 1)
 
@@ -270,10 +360,14 @@ if __name__ == "__main__":
         render(dataset[i][1])
     
     def show_3d_viz_v2(ds):
+        import os
+        # os.environ["RERUN_VIEWER_PORT"] = "9877"
+
         i = random.randint(0, len(ds)-1)
         smp = ds[i]  # smp has 2 frames: smp[0], smp[1]
 
         rr.init("viz", spawn=True)
+        # rr.connect_tcp(addr="0.0.0.0:9876")
 
         # Gather keypoint tracks across both frames
         # Suppose tracks_3d is shape (N,3) in each frame
@@ -300,6 +394,7 @@ if __name__ == "__main__":
             pts = smp[t]['pts3d'].reshape(-1, 3)
             img = ((smp[t]['img'].permute(1,2,0).numpy() + 1)/2*255).astype(np.uint8)
             c   = img.reshape(-1, 3)
+            print(f"pts shape: {pts.shape}, colors shape: {c.shape}, pts example: {pts[0]}")
             rr.log(f"scene/dense_{t}", rr.Points3D(pts, colors=c))
             
     dataset_location = "data/pointodyssey"  # Change this to the correct path
@@ -307,7 +402,7 @@ if __name__ == "__main__":
     use_augs = False
     S = 2
     N = 1
-    strides = [1, 2, 3, 4, 5, 6, 7, 8, 9]
+    strides = [9]
     clip_step = 2
     quick = False  # Set to True for quick testing
 
@@ -328,17 +423,18 @@ if __name__ == "__main__":
         z_far=80,
     )
 
-    idxs = np.arange(0, len(dataset) - 1, (len(dataset) - 1) // 10)
+    idxs = np.arange(0, len(dataset) - 1, 1)
+    example = dataset[idxs[0]]
 
-    print(dataset[idxs[0]][0].keys())
-    print(f"len: {len(dataset[idxs[0]])}")
-    for k, v in dataset[idxs[0]][0].items():
+    print(example[0].keys())
+    print(f"len: {len(example)}")
+    for k, v in example[0].items():
         if isinstance(v, np.ndarray):
-            print(f"{k}:", dataset[idxs[0]][0][k].shape)
+            print(f"{k}:", example[0][k].shape)
         elif isinstance(v, torch.Tensor):
-            print(f"{k}:", dataset[idxs[0]][0][k].size())
+            print(f"{k}:", example[0][k].size())
         else:
-            print(f"{k}:", dataset[idxs[0]][0][k])
+            print(f"{k}:", example[0][k])
 
     print(f"data['img']: {dataset[0][0]['img']}")
     print(f"data['depthmap']: {dataset[0][0]['depthmap']}")

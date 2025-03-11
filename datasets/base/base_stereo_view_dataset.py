@@ -139,6 +139,43 @@ class BaseStereoViewDataset (EasyDataset):
             assert width >= height
             self._resolutions.append((width, height))
 
+    def _compute_crop_bbox(self, image, intrinsics, info=None):
+        """
+        Cropping centered on the principal point.
+        The crop bounding box will be centered on (cx, cy). 
+        The new window will be a rectangle of size (2 * min_margin_x, 2 * min_margin_y).
+        
+        Parameters:
+            image (PIL.Image.Image): The input image.
+            intrinsics (np.ndarray): The 3x3 camera intrinsics matrix.
+            info (any, optional): Optional info for error messages.
+            
+        Returns:
+            crop_bbox (tuple): The crop bounding box as (l, t, r, b)
+                            where l = left, t = top, r = right, b = bottom.
+        """
+        # cropping centered on the principal point
+        # Get image dimensions
+        W, H = image.size
+        # Compute the principal point (rounded to int)
+        cx, cy = intrinsics[:2, 2].round().astype(int)
+        # Determine the minimum margin from the principal point to the image borders
+        min_margin_x = min(cx, W - cx)
+        min_margin_y = min(cy, H - cy)
+        
+        # Basic sanity check on the principal point location
+        assert min_margin_x > W / 5, f"Bad principal point in view={info}"
+        assert min_margin_y > H / 5, f"Bad principal point in view={info}"
+        
+        # Define the crop bounding box centered on (cx,cy)
+        # the new window will be a rectangle of size (2*min_margin_x, 2*min_margin_y) centered on (cx,cy)
+        l = cx - min_margin_x
+        t = cy - min_margin_y
+        r = cx + min_margin_x
+        b = cy + min_margin_y
+        
+        return (l, t, r, b)
+
     def _crop_resize_if_necessary(self, image, depthmap, intrinsics, resolution, rng=None, info=None):
         """ This function:
             - first downsizes the image with LANCZOS inteprolation,
@@ -148,17 +185,7 @@ class BaseStereoViewDataset (EasyDataset):
             image = PIL.Image.fromarray(image)
 
         # downscale with lanczos interpolation so that image.size == resolution
-        # cropping centered on the principal point
-        W, H = image.size
-        cx, cy = intrinsics[:2, 2].round().astype(int)
-        min_margin_x = min(cx, W-cx)
-        min_margin_y = min(cy, H-cy)
-        assert min_margin_x > W/5, f'Bad principal point in view={info}'
-        assert min_margin_y > H/5, f'Bad principal point in view={info}'
-        # the new window will be a rectangle of size (2*min_margin_x, 2*min_margin_y) centered on (cx,cy)
-        l, t = cx - min_margin_x, cy - min_margin_y
-        r, b = cx + min_margin_x, cy + min_margin_y
-        crop_bbox = (l, t, r, b)
+        crop_bbox = self._compute_crop_bbox(image, intrinsics, info)
         image, depthmap, intrinsics = cropping.crop_image_depthmap(image, depthmap, intrinsics, crop_bbox)
 
         # transpose the resolution if necessary
